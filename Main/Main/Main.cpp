@@ -76,11 +76,15 @@ void Padding(Mat InpImg, Mat Pad, int n)
 	}
 }
 
-void GaussianFilter(Mat In_Pad, Mat Out, int nHeight, int nWidth, double sigma) {
+void GaussianFilter(Mat In, Mat Out, int nHeight, int nWidth, double sigma) 
+{
 	double gaussian[3][3] = { 0.0 };
 	double sum = 0.0;
-	for (int h = 0; h < 3; h++) {
-		for (int w = 0; w < 3; w++) {
+
+	for (int h = 0; h < 3; h++)
+	{
+		for (int w = 0; w < 3; w++)
+		{
 			double num = -(double)(h * h + w * w) / ((2 * sigma * sigma));
 			double e = exp(num);
 			double den = 2 * PI * sigma * sigma;
@@ -89,14 +93,18 @@ void GaussianFilter(Mat In_Pad, Mat Out, int nHeight, int nWidth, double sigma) 
 		}
 	}
 
-	for (int h = 0; h < nHeight; h++) {
-		for (int w = 0; w < nWidth; w++) {
+	for (int h = 0; h < nHeight; h++)
+	{
+		for (int w = 0; w < nWidth; w++)
+		{
 			double result = 0;
 			int i = 0;
-			for (int pH = h; pH < 3 + h; pH++) {
+			for (int th = h; th < 3 + h; th++)
+			{
 				int j = 0;
-				for (int pW = w; pW < 3 + w; pW++) {
-					result += In_Pad.at<uchar>(pH, pW) * (gaussian[i][j++] / sum);
+				for (int tw = w; tw < 3 + w; tw++)
+				{
+					result += In.at<uchar>(th, tw) * (gaussian[i][j++] / sum);
 				}
 				i++;
 			}
@@ -104,6 +112,7 @@ void GaussianFilter(Mat In_Pad, Mat Out, int nHeight, int nWidth, double sigma) 
 				result = 255;
 			else if (result < 0)
 				result = 0;
+
 			Out.at<uchar>(h, w) = (unsigned char)result;
 		}
 	}
