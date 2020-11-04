@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <opencv2/opencv.hpp>
+#define PI 3.141592
 //#include <gsl/gsl_fit.h>
 
 using namespace cv;
@@ -63,6 +64,50 @@ Mat region_of_interest(Mat img_edges, int height, int width)
 	return img_masked;
 }
 
+// 상하좌우로 n만큼 늘려준다
+void Padding(Mat InpImg, Mat Pad, int n)
+{
+	for (int i = 0; i < InpImg.rows; i++)
+	{
+		for (int j = 0; j < InpImg.cols; j++)
+		{
+			Pad.at<uchar>(i + n, j + n) = InpImg.at<uchar>(i, j);
+		}
+	}
+}
+
+void GaussianFilter(Mat In_Pad, Mat Out, int nHeight, int nWidth, double sigma) {
+	double gaussian[3][3] = { 0.0 };
+	double sum = 0.0;
+	for (int h = 0; h < 3; h++) {
+		for (int w = 0; w < 3; w++) {
+			double num = -(double)(h * h + w * w) / ((2 * sigma * sigma));
+			double e = exp(num);
+			double den = 2 * PI * sigma * sigma;
+			gaussian[h][w] = (1.0 / den) * e;
+			sum += gaussian[h][w];
+		}
+	}
+
+	for (int h = 0; h < nHeight; h++) {
+		for (int w = 0; w < nWidth; w++) {
+			double result = 0;
+			int i = 0;
+			for (int pH = h; pH < 3 + h; pH++) {
+				int j = 0;
+				for (int pW = w; pW < 3 + w; pW++) {
+					result += In_Pad.at<uchar>(pH, pW) * (gaussian[i][j++] / sum);
+				}
+				i++;
+			}
+			if (result > 255)
+				result = 255;
+			else if (result < 0)
+				result = 0;
+			Out.at<uchar>(h, w) = (unsigned char)result;
+		}
+	}
+}
 
 int main()
 {
@@ -91,6 +136,7 @@ int main()
 
 		//미리 정해둔 흰색, 노란색 범위 내에 있는 부분만 차선 후보로 따로 저장하는거
 
+		//imshow("Original image", frame);
 		//2. 차선 후보 따로 저장
 		Mat img_filtered;
 		img_filtered = extract_colors(frame);
@@ -101,7 +147,14 @@ int main()
 		//3. 그레이스케일 영상으로 변환하여 에지 성분을 추출
 		Mat img_edges;
 		cvtColor(img_filtered, frame, COLOR_BGR2GRAY);
-		GaussianBlur(frame, frame, Size(3, 3), 0, 0);
+
+		Mat GF = Mat::zeros(frame.rows + 3, frame.cols + 3, 0);
+		Padding(frame, GF, 3);
+		GaussianFilter(GF, GF, nHeight, nWidth, 0);
+		//GaussianBlur(frame, frame, Size(3, 3), 0, 0);
+		imshow("Gaussian Filter", GF);
+		//imshow("GaussianBlur", frame);
+
 
 		Canny(frame, img_edges, 50, 150);
 
@@ -115,7 +168,7 @@ int main()
 		img_edges = region_of_interest(img_edges, height, width);
 
 		// 4번까지 실행결과
-		imshow("Extract edge", img_edges);
+		//imshow("Extract edge", img_edges);
 
 		//그레이 스케일 영상으로 변환하여 Edge 추출
 		//imshow("TestSample", frame);
