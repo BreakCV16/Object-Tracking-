@@ -1,47 +1,60 @@
-ï»¿#include <iostream>
+#include <iostream>
 #include <opencv2/opencv.hpp>
+#include "EdgeExtract.h"
 #include "Converter.h"
+#include "Region.h"
 
 using namespace cv;
 using namespace std;
 
 int main()
 {
-	//ë„ë¡œ ì£¼í–‰ ì˜ìƒ
-	VideoCapture DrivingVideo("data/video.mp4");
+	//µµ·Î ÁÖÇà ¿µ»ó
+	VideoCapture DrivingVideo("data/challenge.mp4");
 
 	Mat frame;
-	Mat Converted_frame;
 
 	if (!DrivingVideo.isOpened())
 	{
 		cout << "Data can not open" << endl;
 		return -1;
 	}
-	VideoWriter writer;
 
-	
+	int nWidth = frame.size().width;
+	int nHeight = frame.size().height;
+	int cnt = 0;
 
-	while(1)
+	while (1)
 	{
-		//ì›ë³¸ ì˜ìƒ ì½ì–´ì˜¤ê¸°
+		//¿øº» ¿µ»ó ÀĞ¾î¿À±â
 		DrivingVideo >> frame;
 		if (frame.empty())
 			break;
 
-		//ë¯¸ë¦¬ ì •í•´ë‘” í°ìƒ‰, ë…¸ë€ìƒ‰ ë²”ìœ„ ë‚´ì— ìˆëŠ” ë¶€ë¶„ë§Œ ì°¨ì„  í›„ë³´ë¡œ ë”°ë¡œ ì €ì¥í•˜ëŠ”ê±°
-		color_detect(frame, Converted_frame);
+		//2. Â÷¼± ÈÄº¸ µû·Î ÀúÀå
+		//img_filtered = Â÷¼± ÈÄº¸ ¿µ»ó
+		Mat img_filtered;
+		//ÈÄº¸¿µ»ó¿¡ µû¸¥ edge¿µ»ó
+		Mat img_edges;
+		color_detect(frame, img_filtered);
 
-		//ê·¸ë ˆì´ ìŠ¤ì¼€ì¼ ì˜ìƒìœ¼ë¡œ ë³€í™˜í•˜ì—¬ Edge ì¶”ì¶œ
-		//
-		//imshow("TestResult", Converted_frame);
+		//3. ±×·¹ÀÌ½ºÄÉÀÏ ¿µ»óÀ¸·Î º¯È¯ÇÏ¿© ¿¡Áö ¼ººĞÀ» ÃßÃâ
+		Apply_Cannyf(img_filtered, img_edges);
+		//imshow("2¹ø",img_edges);
+
+		//4. Â÷¼± °ËÃâÇÒ ¿µ¿ªÀ» Á¦ÇÑÇÔ (ÁøÇà¹æÇâ ¹Ù´Ú¿¡ Á¸ÀçÇÏ´Â Â÷¼±À¸·Î ÇÑÁ¤)
+		img_edges = SetRegion(img_edges, img_filtered.rows, img_filtered.cols);
+
+		// 4¹ø±îÁö ½ÇÇà°á°ú
+		imshow("Extract edge", img_edges);
+
+		//±×·¹ÀÌ ½ºÄÉÀÏ ¿µ»óÀ¸·Î º¯È¯ÇÏ¿© Edge ÃßÃâ
+		//imshow("TestSample", frame);
+
 		if (waitKey(10) > 0)
 			break;
 	}
+
+	//writer.release();
 	return 0;
 }
-/*
-void color_detecting(Mat img_in, Mat& Converted_img)
-{
-	
-}*/

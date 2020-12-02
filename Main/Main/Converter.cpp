@@ -47,7 +47,8 @@ void RGB2HSV(Mat img_in,Mat& hsv_img) {
 			//s = round(255 * s);
 			
 			if (h < 0)
-				h += 180;
+				h += 360;
+			//h = h / 2;
 			hsv_img.at<Vec3f>(i, j)[0] = h;
 			hsv_img.at<Vec3f>(i, j)[1] = s;
 		}
@@ -79,5 +80,5 @@ void color_detect(Mat img_in, Mat& img_out)
 	addWeighted(white_image, 1.0, yellow_image, 1.0, 0.0, img_combine);
 	img_combine.copyTo(img_out);
 	
-	imshow("yellow", img_out);
+	//imshow("yellow", img_out);
 }
