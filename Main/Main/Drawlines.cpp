@@ -1,10 +1,16 @@
-#include <iostream>
-#include <opencv2/opencv.hpp>
+#include <opencv2/opencv.hpp>  
+#include <opencv2/imgproc.hpp>
 #include <gsl/gsl_fit.h>
+#include <iostream>  
+
 
 using namespace cv;
 using namespace std;
-
+//Region - of - interest vertices, 관심 영역 범위 계산시 사용 
+//We want a trapezoid shape, with bottom edge at the bottom of the image
+float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
+float trap_top_width = 0.07;     // ditto for top edge of trapezoid
+float trap_height = 0.4;
 
 void draw_line(Mat& img_line, vector<Vec4i> lines)
 {
