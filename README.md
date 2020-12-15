@@ -6,3 +6,4 @@ Line &amp; Car Tracking during driving stituation
 일정 : 중간발표 12/17업로드 (금)
 
 Line Tracking 완료.
+Object Detection : Haar Cascade 이용
