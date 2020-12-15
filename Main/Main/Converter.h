@@ -1,16 +1,13 @@
 #ifndef Converter_h
 #define Converter_h
+
 #include <opencv2/opencv.hpp>
-class Converter {
-public:
-	void RGBtoHSI(uchar r, uchar g, uchar b, double HSI[]);
+using namespace cv;
 
-	void HSItoRGB(double h, double s, double i, unsigned char** rgb);
+void color_detect(Mat img_in, Mat& img_out);
+	//원하는 컬러 detect
+//void RGB2HSV(Mat &src, Mat &img_out);
 
-	void RGBtoHsv(uchar r, uchar g, uchar b, double Hsv[]);
-
-	void HsvToRGB(double h, double s, double v, unsigned char** rgb);
-};
-
+void RGB2HSV(Mat img_in,Mat& hsv);
 
 #endif
