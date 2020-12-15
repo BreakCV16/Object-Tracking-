@@ -17,12 +17,12 @@ float theta = 1 * CV_PI / 180; // angular resolution in radians of the Hough gri
 float hough_threshold = 15;	 // minimum number of votes(intersections in Hough grid cell)
 float minLineLength = 10; //minimum number of pixels making up a line
 float maxLineGap = 20;	//maximum gap in pixels between connectable line segments
-//
+
 
 int main()
 {
 	//도로 주행 영상
-	VideoCapture DrivingVideo("data/challenge.mp4");
+	VideoCapture DrivingVideo("data/video.mp4");
 
 	Mat frame;
 
@@ -57,7 +57,7 @@ int main()
 
 		//////haar cascades로 object detection ////////////
 		vector<Rect> cars;
-		car_cascade.detectMultiScale(frame, cars, 1.1, 3);
+		car_cascade.detectMultiScale(frame, cars, 1.3, 2);
 
 		for (int c = 0; c < cars.size(); c++) {
 			Point rectCenterPt = findCenter(cars[c]);
