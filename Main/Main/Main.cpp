@@ -1,73 +1,25 @@
-ï»¿#include <iostream>
+#include <iostream>
 #include <opencv2/opencv.hpp>
-//#include <gsl/gsl_fit.h>
+#include "EdgeExtract.h"
+#include "Converter.h"
+#include "Region.h"
+#include "Drawlines.h"
 
 using namespace cv;
 using namespace std;
-
-//*** ì°¨ì„  ìƒ‰ê¹” ë²”ìœ„ ***// 
-//í°ìƒ‰ ì°¨ì„  (RGB)
-Scalar white_Max = Scalar(255, 255, 255);
-Scalar white_min = Scalar(200, 200, 200);
-// ë…¸ë€ìƒ‰ ì°¨ì„ (HSV)
-Scalar yellow_Max = Scalar(40, 255, 255);
-Scalar yellow_min = Scalar(10, 100, 100);
-
-//*** ì˜ìƒì˜ í°ìƒ‰ê³¼ ë…¸ë€ìƒ‰ ë¶€ë¶„ë§Œ ë‚¨ê¸°ëŠ” ê³¼ì • ***//
-Mat extract_colors(Mat Ori)
-{
-	Mat img_bgr, img_hsv, img_mixed;
-	Mat white_mask, white_image, yellow_mask, yellow_image;
-	Ori.copyTo(img_bgr);
-
-	//í°ìƒ‰ ì¶”ì¶œ
-	inRange(img_bgr, white_min, white_Max, white_mask);
-	bitwise_and(img_bgr, img_bgr, white_image, white_mask);
-
-	//ë…¸ë€ìƒ‰ ì¶”ì¶œ
-	cvtColor(img_bgr, img_hsv, COLOR_BGR2HSV);
-
-	inRange(img_hsv, yellow_min, yellow_Max, yellow_mask);
-	bitwise_and(img_bgr, img_bgr, yellow_image, yellow_mask);
-
-	//ë‘ ìƒ‰ì˜ ê²°ê³¼ë¥¼ í•©ì¹˜ëŠ” ê³¼ì •
-	addWeighted(white_image, 1.0, yellow_image, 1.0, 0.0, img_mixed);
-
-	return img_mixed;
-}
-
-//*** ì°¨ì„ ìœ¼ë¡œ ì¸ì‹í•  ë²”ìœ„ ì§€ì • ***//
-Mat region_of_interest(Mat img_edges, int height, int width)
-{
-	float trap_bottom_width = 0.85;  // ì‚¬ë‹¤ë¦¬ê¼´ì˜ ì•„ë˜ìª½ ê°€ì¥ìë¦¬ ë„ˆë¹„, ì´ë¯¸ì§€ ë„ˆë¹„ì˜ ë°±ë¶„ìœ¨ë¡œ í‘œì‹œ
-	float trap_top_width = 0.07;     // ì‚¬ë‹¤ë¦¬ê¼´ì˜ ìƒë‹¨ ê°€ì¥ìë¦¬ ë„ˆë¹„, ì´ë¯¸ì§€ ë„ˆë¹„ì˜ ë°±ë¶„ìœ¨ë¡œ í‘œì‹œ
-	float trap_height = 0.4;	// ì‚¬ë‹¤ë¦¬ê¼´ì˜ ë†’ì´, ì´ë¯¸ì§€ ë†’ì´ì˜ ë°±ë¶„ìœ¨ë¡œ í‘œì‹œ
-
-	Point points[4];
-	points[0] = Point((width * (1 - trap_bottom_width)) / 2, height);
-	points[1] = Point((width * (1 - trap_top_width)) / 2, height - height * trap_height);
-	points[2] = Point(width - (width * (1 - trap_top_width)) / 2, height - height * trap_height);
-	points[3] = Point(width - (width * (1 - trap_bottom_width)) / 2, height);
-
-	Mat img_mask = Mat::zeros(img_edges.rows, img_edges.cols, CV_8UC1);
-
-	Scalar ignore_mask_color = Scalar(255, 255, 255);
-	const Point* ppt[1] = { points };
-	int npt[] = { 4 };
-
-	fillPoly(img_mask, ppt, npt, 1, Scalar(255, 255, 255), LINE_8); // ì±„ìš°ê¸°
-
-	Mat img_masked;
-	bitwise_and(img_edges, img_mask, img_masked);
-
-	return img_masked;
-}
-
+//
+//Hough Transform ÆÄ¶ó¹ÌÅÍ
+float rho = 2; // distance resolution in pixels of the Hough grid
+float theta = 1 * CV_PI / 180; // angular resolution in radians of the Hough grid
+float hough_threshold = 15;	 // minimum number of votes(intersections in Hough grid cell)
+float minLineLength = 10; //minimum number of pixels making up a line
+float maxLineGap = 20;	//maximum gap in pixels between connectable line segments
+//
 
 int main()
 {
-	//ë„ë¡œ ì£¼í–‰ ì˜ìƒ
-	VideoCapture DrivingVideo("data/video.mp4");
+	//µµ·Î ÁÖÇà ¿µ»ó
+	VideoCapture DrivingVideo("data/challenge.mp4");
 
 	Mat frame;
 
@@ -76,7 +28,6 @@ int main()
 		cout << "Data can not open" << endl;
 		return -1;
 	}
-	VideoWriter writer;
 
 	int nWidth = frame.size().width;
 	int nHeight = frame.size().height;
@@ -84,49 +35,58 @@ int main()
 
 	while (1)
 	{
-		//ì›ë³¸ ì˜ìƒ ì½ì–´ì˜¤ê¸°
+		//¿øº» ¿µ»ó ÀĞ¾î¿À±â
 		DrivingVideo >> frame;
 		if (frame.empty())
 			break;
 
-		//ë¯¸ë¦¬ ì •í•´ë‘” í°ìƒ‰, ë…¸ë€ìƒ‰ ë²”ìœ„ ë‚´ì— ìˆëŠ” ë¶€ë¶„ë§Œ ì°¨ì„  í›„ë³´ë¡œ ë”°ë¡œ ì €ì¥í•˜ëŠ”ê±°
-
-		//2. ì°¨ì„  í›„ë³´ ë”°ë¡œ ì €ì¥
+		//2. Â÷¼± ÈÄº¸ µû·Î ÀúÀå
+		//img_filtered = Â÷¼± ÈÄº¸ ¿µ»ó
 		Mat img_filtered;
-		img_filtered = extract_colors(frame);
-
-		// 2ë²ˆê¹Œì§€ ì‹¤í–‰ê²°ê³¼
-		//imshow("img_filtered", img_filtered);
-
-		//3. ê·¸ë ˆì´ìŠ¤ì¼€ì¼ ì˜ìƒìœ¼ë¡œ ë³€í™˜í•˜ì—¬ ì—ì§€ ì„±ë¶„ì„ ì¶”ì¶œ
+		//ÈÄº¸¿µ»ó¿¡ µû¸¥ edge¿µ»ó
 		Mat img_edges;
-		cvtColor(img_filtered, frame, COLOR_BGR2GRAY);
-		GaussianBlur(frame, frame, Size(3, 3), 0, 0);
+		color_detect(frame, img_filtered);
 
-		Canny(frame, img_edges, 50, 150);
+		//3. ±×·¹ÀÌ½ºÄÉÀÏ ¿µ»óÀ¸·Î º¯È¯ÇÏ¿© ¿¡Áö ¼ººĞÀ» ÃßÃâ
+		Apply_Cannyf(img_filtered, img_edges);
+		//imshow("2¹ø",img_edges);
 
-		// 3ë²ˆê¹Œì§€ ì‹¤í–‰ê²°ê³¼
-		//imshow("edge result", img_edges);
+		//4. Â÷¼± °ËÃâÇÒ ¿µ¿ªÀ» Á¦ÇÑÇÔ (ÁøÇà¹æÇâ ¹Ù´Ú¿¡ Á¸ÀçÇÏ´Â Â÷¼±À¸·Î ÇÑÁ¤)
+		img_edges = SetRegion(img_edges, img_filtered.rows, img_filtered.cols);
 
-		int width = img_filtered.cols;
-		int height = img_filtered.rows;
+		// 4¹ø±îÁö ½ÇÇà°á°ú
+		//imshow("Extract edge", img_edges);
 
-		//4. ì°¨ì„  ê²€ì¶œí•  ì˜ì—­ì„ ì œí•œí•¨ (ì§„í–‰ë°©í–¥ ë°”ë‹¥ì— ì¡´ì¬í•˜ëŠ” ì°¨ì„ ìœ¼ë¡œ í•œì •)
-		img_edges = region_of_interest(img_edges, height, width);
+		UMat uImage_edges;
+		img_edges.copyTo(uImage_edges);
 
-		// 4ë²ˆê¹Œì§€ ì‹¤í–‰ê²°ê³¼
-		imshow("Extract edge", img_edges);
+		//5. Á÷¼± ¼ººĞÀ» ÃßÃâ(°¢ Á÷¼±ÀÇ ½ÃÀÛÁÂÇ¥¿Í ³¡ÁÂÇ¥¸¦ °è»êÇÔ)
+		vector<Vec4i> lines;
+		HoughLinesP(uImage_edges, lines, rho, theta, hough_threshold, minLineLength, maxLineGap);
+		//±×·¹ÀÌ ½ºÄÉÀÏ ¿µ»óÀ¸·Î º¯È¯ÇÏ¿© Edge ÃßÃâ
+		
 
-		//ê·¸ë ˆì´ ìŠ¤ì¼€ì¼ ì˜ìƒìœ¼ë¡œ ë³€í™˜í•˜ì—¬ Edge ì¶”ì¶œ
-		//imshow("TestSample", frame);
+		Mat img_line = Mat::zeros(frame.rows, frame.cols, CV_8UC3);
+		draw_line(img_line, lines);
+		
+		Mat img_annotated;
+		//7. ¿øº» ¿µ»ó¿¡ 6¹øÀÇ Á÷¼±À» °°ÀÌ º¸¿©ÁÜ 
+		addWeighted(frame, 0.8, img_line, 1.0, 0.0, img_annotated);
+		//imshow("img_annotated", img_annotated);
+		
+		//9. °á°ú¸¦ È­¸é¿¡ º¸¿©ÁÜ 
+		Mat img_result;
+		resize(img_annotated, img_annotated, Size(frame.rows * 0.7, frame.cols * 0.7));
+		resize(img_edges, img_edges, Size(frame.rows * 0.7, frame.cols * 0.7));
+		cvtColor(img_edges, img_edges, COLOR_GRAY2BGR);
+		hconcat(img_edges, img_annotated, img_result);
+		imshow("ÇÕÄ£°Å", img_result);
+		
 
 		if (waitKey(10) > 0)
 			break;
 	}
+
+	//writer.release();
 	return 0;
 }
-/*
-void color_detecting(Mat img_in, Mat& Converted_img)
-{
-
-}*/
