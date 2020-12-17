@@ -44,11 +44,11 @@ void RGB2HSV(Mat img_in,Mat& hsv_img) {
 				h = 4 + (r - g) / delta;
 			}
 			h *= 60;
-			//s = round(255 * s);
+			
 			
 			if (h < 0)
 				h += 360;
-			//h = h / 2;
+			
 			hsv_img.at<Vec3f>(i, j)[0] = h;
 			hsv_img.at<Vec3f>(i, j)[1] = s;
 		}

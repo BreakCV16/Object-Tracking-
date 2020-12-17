@@ -6,32 +6,19 @@
 
 using namespace cv;
 using namespace std;
-//Region - of - interest vertices, 관심 영역 범위 계산시 사용 
-//We want a trapezoid shape, with bottom edge at the bottom of the image
+
+//관심영력 추출을 통해 받아온 Mat데이터를 받아서 Draw를 실행하는 함수.
 float trap_bottom_width = 0.85;  // width of bottom edge of trapezoid, expressed as percentage of image width
 float trap_top_width = 0.07;     // ditto for top edge of trapezoid
 float trap_height = 0.4;
 
 void draw_line(Mat& img_line, vector<Vec4i> lines)
 {
-	if (lines.size() == 0) return;
-
-	/*
-	NOTE : this is the function you might want to use as a starting point once you want to
-	average / extrapolate the line segments you detect to map out the full
-	extent of the lane(going from the result shown in raw - lines - example.mp4
-	to that shown in P1_example.mp4).
-
-	Think about things like separating line segments by their
-	slope((y2 - y1) / (x2 - x1)) to decide which segments are part of the left
-	line vs.the right line.Then, you can average the position of each of
-	the lines and extrapolate to the top and bottom of the lane.
-
-	This function draws `lines` with `color` and `thickness`.
-	Lines are drawn on the image inplace(mutates the image).
-	If you want to make the lines semi - transparent, think about combining
-	this function with the weighted_img() function below
-	*/
+	//라인이 없을경우, 리턴한다.
+	if (lines.size() == 0) {
+		cout << "No data of lines" << endl;
+		return;
+	}
 
 	// In case of error, don't draw the line(s)
 	bool draw_right = true;
@@ -40,9 +27,9 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 	int height = img_line.rows;
 
 
-	//Find slopes of all lines
-	//But only care about lines where abs(slope) > slope_threshold
-	float slope_threshold = 0.5;
+	//모든 선에 대한 기울기를 찾는다.
+	//Threshold보다 큰 기울기에 대해서만 찾는다.
+	float slope_threshold = 0.6;
 	vector<float> slopes;
 	vector<Vec4i> new_lines;
 
@@ -54,11 +41,10 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 		int x2 = line[2];
 		int y2 = line[3];
 
-
+		//기울기 계산한다.
 		float slope;
-		//Calculate slope
-		if (x2 - x1 == 0) //corner case, avoiding division by 0
-			slope = 999.0; //practically infinite slope
+		if (x2 - x1 == 0) //코너의 경우를 대비
+			slope = 100000.0; 
 		else
 			slope = (y2 - y1) / (float)(x2 - x1);
 
@@ -71,9 +57,8 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 	}
 
 
-
-	// Split lines into right_lines and left_lines, representing the right and left lane lines
-	// Right / left lane lines must have positive / negative slope, and be on the right / left half of the image
+	// 오른쪽 왼쪽 나뉘주고
+	//기울기 계산 양인지 음인지 계산
 	vector<Vec4i> right_lines;
 	vector<Vec4i> left_lines;
 
@@ -98,8 +83,7 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 	}
 
 
-	//Run linear regression to find best fit line for right and left lane lines
-	//Right lane lines
+	//선형회귀 오른쪽진행
 	double right_lines_x[1000];
 	double right_lines_y[1000];
 	float right_m, right_b;
@@ -121,41 +105,28 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 		right_lines_y[right_index] = y2;
 		right_index++;
 	}
-
-
-	if (right_index > 0) {
-
+	if (right_index > 0){
 		double c0, c1, cov00, cov01, cov11, sumsq;
 		gsl_fit_linear(right_lines_x, 1, right_lines_y, 1, right_index,
 			&c0, &c1, &cov00, &cov01, &cov11, &sumsq);
-
-		//printf("# best fit: Y = %g + %g X\n", c0, c1);
-
 		right_m = c1;
 		right_b = c0;
 	}
 	else {
 		right_m = right_b = 1;
-
 		draw_right = false;
 	}
-
-
-
-	// Left lane lines
+	//왼쪽
 	double left_lines_x[1000];
 	double left_lines_y[1000];
 	float left_m, left_b;
-
 	int left_index = 0;
 	for (int i = 0; i < left_lines.size(); i++) {
-
 		Vec4i line = left_lines[i];
 		int x1 = line[0];
 		int y1 = line[1];
 		int x2 = line[2];
 		int y2 = line[3];
-
 		left_lines_x[left_index] = x1;
 		left_lines_y[left_index] = y1;
 		left_index++;
@@ -163,27 +134,18 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 		left_lines_y[left_index] = y2;
 		left_index++;
 	}
-
-
 	if (left_index > 0) {
 		double c0, c1, cov00, cov01, cov11, sumsq;
 		gsl_fit_linear(left_lines_x, 1, left_lines_y, 1, left_index,
 			&c0, &c1, &cov00, &cov01, &cov11, &sumsq);
-
-		//printf("# best fit: Y = %g + %g X\n", c0, c1);
-
 		left_m = c1;
 		left_b = c0;
 	}
 	else {
 		left_m = left_b = 1;
-
 		draw_left = false;
 	}
-
-
-
-	//Find 2 end points for right and left lines, used for drawing the line
+	//오른쪽 왼쪽에 각각 끝점 두개 찾고,draw실행
 	//y = m*x + b--> x = (y - b) / m
 	int y1 = height;
 	int y2 = height * (1 - trap_height);
@@ -193,18 +155,14 @@ void draw_line(Mat& img_line, vector<Vec4i> lines)
 
 	float left_x1 = (y1 - left_b) / left_m;
 	float left_x2 = (y2 - left_b) / left_m;
-
-
-	//Convert calculated end points from float to int
-	y1 = int(y1);
-	y2 = int(y2);
+	//float로 된거 int형으로 변환해주고
 	right_x1 = int(right_x1);
 	right_x2 = int(right_x2);
 	left_x1 = int(left_x1);
 	left_x2 = int(left_x2);
-
-
-	//Draw the right and left lines on image
+	y1 = int(y1);
+	y2 = int(y2);
+	//이미지에 오른쪽 선과 왼쪽 선을 그려준다
 	if (draw_right)
 		line(img_line, Point(right_x1, y1), Point(right_x2, y2), Scalar(255, 0, 0), 10);
 	if (draw_left)

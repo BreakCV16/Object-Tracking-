@@ -1,5 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#define PI 3.14159265359
 //#include <gsl/gsl_fit.h>
 
 using namespace cv;
@@ -36,32 +37,6 @@ Mat extract_colors(Mat Ori)
 	return img_mixed;
 }
 
-//*** 차선으로 인식할 범위 지정 ***//
-Mat region_of_interest(Mat img_edges, int height, int width)
-{
-	float trap_bottom_width = 0.85;  // 사다리꼴의 아래쪽 가장자리 너비, 이미지 너비의 백분율로 표시
-	float trap_top_width = 0.07;     // 사다리꼴의 상단 가장자리 너비, 이미지 너비의 백분율로 표시
-	float trap_height = 0.4;	// 사다리꼴의 높이, 이미지 높이의 백분율로 표시
-
-	Point points[4];
-	points[0] = Point((width * (1 - trap_bottom_width)) / 2, height);
-	points[1] = Point((width * (1 - trap_top_width)) / 2, height - height * trap_height);
-	points[2] = Point(width - (width * (1 - trap_top_width)) / 2, height - height * trap_height);
-	points[3] = Point(width - (width * (1 - trap_bottom_width)) / 2, height);
-
-	Mat img_mask = Mat::zeros(img_edges.rows, img_edges.cols, CV_8UC1);
-
-	Scalar ignore_mask_color = Scalar(255, 255, 255);
-	const Point* ppt[1] = { points };
-	int npt[] = { 4 };
-
-	fillPoly(img_mask, ppt, npt, 1, Scalar(255, 255, 255), LINE_8); // 채우기
-
-	Mat img_masked;
-	bitwise_and(img_edges, img_mask, img_masked);
-
-	return img_masked;
-}
 Mat Filtering(unsigned char* input, int width, int height, int Fsize = 3)
 {
 	Mat Padding;
@@ -433,7 +408,49 @@ Mat hysteresis(unsigned char* input, int width, int height, int Fsize = 3)
 
 }
 
-void Apply_Cannyf(Mat img_filtered, Mat &img_edges) {
+void GaussianFilter(Mat In, Mat Out, int nWidth, int nHeight, double sigma)
+{
+	double gaussian[3][3] = { 0.0 };
+	double sum = 0.0;
+
+	for (int h = 0; h < 3; h++)
+	{
+		for (int w = 0; w < 3; w++)
+		{
+			double num = -(double)(h * h + w * w) / ((2 * sigma * sigma));
+			double e = exp(num);
+			double den = 2 * PI * sigma * sigma;
+			gaussian[h][w] = (1.0 / den) * e;
+			sum += gaussian[h][w];
+		}
+	}
+
+	for (int h = 0; h < nHeight; h++)
+	{
+		for (int w = 0; w < nWidth; w++)
+		{
+			double result = 0;
+			int i = 0;
+			for (int th = h; th < 3 + h; th++)
+			{
+				int j = 0;
+				for (int tw = w; tw < 3 + w; tw++)
+				{
+					result += In.at<uchar>(th, tw) * (gaussian[i][j++] / sum);
+				}
+				i++;
+			}
+			if (result > 255)
+				result = 255;
+			else if (result < 0)
+				result = 0;
+
+			Out.at<uchar>(h, w) = (unsigned char)result;
+		}
+	}
+}
+
+void Apply_Cannyf(Mat img_filtered, Mat& img_edges) {
 
 	//-1. BGR2GRAY
 	Mat img_gray = Mat(img_filtered.rows, img_filtered.cols, CV_8UC1);
@@ -453,9 +470,12 @@ void Apply_Cannyf(Mat img_filtered, Mat &img_edges) {
 	img_pad = Filtering(img_gray.data, img_gray.cols, img_gray.rows);
 	//imshow("padding", img_pad);
 
-		//-3.GaussianFilter - 미완성
-	Mat img_blur;
-	GaussianBlur(img_pad, img_blur, Size(3, 3), 0, 0);
+		//-3.GaussianFilter
+
+	Mat img_blur = Mat::zeros(img_pad.rows, img_pad.cols, 0);
+	GaussianFilter(img_blur, img_blur, img_gray.cols, img_gray.rows, 0);
+
+	//GaussianBlur(img_pad, img_blur, Size(3, 3), 0, 0);
 	//imshow("Gaussian Blur", img_blur);
 
 		//-4.Sobel
@@ -507,5 +527,5 @@ void Apply_Cannyf(Mat img_filtered, Mat &img_edges) {
 	Mat img_edge;
 	img_edge = hysteresis(img_dtp.data, img_gray.cols, img_gray.rows);
 	img_edge.copyTo(img_edges);
-	
+
 }
